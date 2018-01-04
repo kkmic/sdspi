@@ -22,7 +22,6 @@ set(SOURCE_FILES
         src/stm32l1xx_hal_msp.c
         src/syscalls.c
         src/sd.c
-        src/fatfs.c
         src/user_diskio.c
         src/startup_stm32l152xb.s
         ${FIRMWARE_ROOT}/Drivers/STM32L1xx_HAL_Driver/Src/stm32l1xx_hal.c

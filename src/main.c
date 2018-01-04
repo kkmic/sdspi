@@ -39,7 +39,9 @@
 #include <ff.h>
 #include <stdlib.h>
 #include "main.h"
-#include "fatfs.h"
+#include "ff.h"
+#include "ff_gen_drv.h"
+#include "user_diskio.h" /* defines USER_Driver as external */
 #include "sd.h"
 
 /* Global structures and functions */
