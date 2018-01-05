@@ -35,5 +35,6 @@ SD_StatusDef SD_Init(void);
 void SPI_Release(void);
 uint8_t SD_Read_Block (uint8_t *buff, uint32_t lba);
 uint8_t SD_Write_Block (uint8_t *buff, uint32_t lba);
+uint8_t SPI_wait_ready(void);
 
 #endif // SDSPI_SD_H

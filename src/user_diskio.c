@@ -109,21 +109,21 @@ Diskio_drvTypeDef USER_Driver =
     };
 
 /* Private functions ---------------------------------------------------------*/
-static inline const char* getCardTypeName() {
-  if (sd_info.type == CT_BASE) {
-    return "Base";
-  } else if (sd_info.type == CT_MMC) {
-    return "MMC";
-  } else if (sd_info.type == (CT_SD2 | CT_BLOCK)) {
-    return "SDHC";
-  } else if (sd_info.type == (CT_SD2)) {
-    return "SDSC";
-  } else if (sd_info.type == CT_SD1) {
-    return "SDv1";
-  } else {
-    return "Unknown";
-  }
-}
+//static inline const char* getCardTypeName() {
+//  if (sd_info.type == CT_BASE) {
+//    return "Base";
+//  } else if (sd_info.type == CT_MMC) {
+//    return "MMC";
+//  } else if (sd_info.type == (CT_SD2 | CT_BLOCK)) {
+//    return "SDHC";
+//  } else if (sd_info.type == (CT_SD2)) {
+//    return "SDSC";
+//  } else if (sd_info.type == CT_SD1) {
+//    return "SDv1";
+//  } else {
+//    return "Unknown";
+//  }
+//}
 
 /**
   * @brief  Initializes a Drive
@@ -137,7 +137,7 @@ DSTATUS USER_initialize (BYTE pdrv)  // Physical drive number to identify the dr
 //  printf("USER_initialize: %d\r\n", pdrv);
   if (SD_Init() == 0) {
     Stat &= ~STA_NOINIT;
-    printf("Card type: %s\r\n", getCardTypeName());
+//    printf("Card type: %s\r\n", getCardTypeName());
   }
 
   return Stat;
@@ -174,9 +174,9 @@ DRESULT USER_read(
     DWORD sector,   /* Sector address in LBA */
     UINT count)     /* Number of sectors to read */
 {
-  printf("USER_read: %d, sector=%ld, count=%d\r\n", pdrv, sector, count);
+//  printf("USER_read: %d, sector=%ld, count=%d\r\n", pdrv, sector, count);
 
-  if (pdrv > 0 || count == 0 || count > 1) return RES_PARERR;
+  if (pdrv > 0 || count != 1) return RES_PARERR;
   if (Stat & STA_NOINIT) return RES_NOTRDY;
 
   if ((sd_info.type & CT_SD2) == 0) {
@@ -205,11 +205,18 @@ DRESULT USER_write(
     UINT count          /* Number of sectors to write */
 )
 {
-  /* USER CODE BEGIN WRITE */
-  /* USER CODE HERE */
 //  printf("USER_write: %d, sector=%ld, count=%d\r\n", pdrv, sector, count);
+
+  if (pdrv || count != 1) return RES_PARERR;
+  if (Stat & STA_NOINIT) return RES_NOTRDY;
+  if (Stat & STA_PROTECT) return RES_WRPRT;
+
+  if (!(sd_info.type & 4)) sector *= 512; /* Convert to byte address if needed */
+  SD_Write_Block((BYTE*)buff,sector); //Считаем блок в буфер
+
+  SPI_Release();
+
   return RES_OK;
-  /* USER CODE END WRITE */
 }
 
 #endif /* _USE_WRITE == 1 */
@@ -234,16 +241,21 @@ DRESULT USER_ioctl(
   if (pdrv > 0) return RES_PARERR;
   if (Stat & STA_NOINIT) return RES_NOTRDY;
 
-  DRESULT res;
+  DRESULT res = RES_PARERR;
   switch (cmd)
   {
+    case CTRL_SYNC : /* Flush dirty buffer if present */
+      SS_SD_SELECT();
+      if (SPI_wait_ready() == 0xFF)
+        res = RES_OK;
+      break;
+
     case GET_SECTOR_SIZE : /* Get sectors on the disk (WORD) */
       *(WORD*)buff = 512;
       res = RES_OK;
       break;
 
     default:
-      res = RES_PARERR;
       break;
   }
 

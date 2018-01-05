@@ -38,6 +38,7 @@
 //#include <string.h>
 #include <ff.h>
 #include <stdlib.h>
+#include <string.h>
 #include "main.h"
 #include "ff.h"
 #include "ff_gen_drv.h"
@@ -55,13 +56,20 @@ static FATFS SDFatFs;
 static char USERPath[4];   /* USER logical drive path */
 static FIL USERFile;  /* File object for USER */
 
-static uint8_t sect[512];
+//static uint8_t sect[512];
+
+#define STR_LENGTH 64
+static char str[STR_LENGTH];
+
+void uart_print(int strlen);
 
 /* Private functions ---------------------------------------------------------*/
 static void SystemClock_Config(void);
 static void UART_Init(void);
 static void SPI_Init(void);
-static FRESULT ReadLongFile(uint16_t limit);
+//static FRESULT ReadLongFile(uint16_t limit);
+
+//static const char TEST_STRING[] = "This is a test string";
 
 /**
   * @brief  Main program
@@ -97,30 +105,77 @@ int main(void)
   BSP_LED_Off(LED4);
   HAL_Delay(200);
 
-  printf("\r\nInit ready.\r\n");
+  uart_print(snprintf(str, STR_LENGTH, "\r\nInit ready.\r\n"));
 
   if (FATFS_LinkDriver(&USER_Driver, USERPath) != 0) {
     Error_Handler("Init failed", 0);
-
   } else {
-    printf("FatFS link driver successful\r\n");
+    uart_print(snprintf(str, STR_LENGTH, "FatFS link driver successful\r\n"));
+
     FRESULT res;
     if ((res = f_mount(&SDFatFs, USERPath, 0)) != FR_OK) {
       Error_Handler("Mount failed", res);
     } else {
-      if ((res = f_open(&USERFile, "test/test.mp4", FA_READ)) != FR_OK) {
-        Error_Handler("Open failed", res);
+// Read example
+//      if ((res = f_open(&USERFile, "test/test.mp4", FA_READ)) != FR_OK) {
+//        Error_Handler("Open failed", res);
+//      } else {
+//        ReadLongFile(128); // buffers
+//        printf("Done.\r\n");
+//
+//        if ((res = f_close(&USERFile)) != FR_OK) {
+//          Error_Handler("Close failed", res);
+//        }
+//        BSP_LED_On(LED3);
+//        for (;;) {}
+//      }
+      if ((res = f_open(&USERFile, "test/test.dat", FA_CREATE_ALWAYS|FA_WRITE)) != FR_OK) {
+        Error_Handler("Create failed", res);
       } else {
-        ReadLongFile(128); // buffers
-        printf("Done.\r\n");
+// Write example
+//        UINT bytesWritten = 0;
+//        res = f_write(&USERFile, TEST_STRING, strlen(TEST_STRING), &bytesWritten);
+//        if (bytesWritten == 0 || res != FR_OK) {
+//          Error_Handler("Error writing file", res);
+//        } else {
+//          printf("Success.\r\n");
+//        }
+//
+//        if ((res = f_close(&USERFile)) != FR_OK) {
+//          Error_Handler("Close failed", res);
+//        }
 
-        if ((res = f_close(&USERFile)) != FR_OK) {
-          Error_Handler("Close failed", res);
+// Directory example
+        FILINFO fileInfo;
+//        char *fn;
+        DIR dir;
+//        DWORD fre_clust, fre_sect, tot_sect;
+
+        res = f_opendir(&dir, "/test");
+        if (res != FR_OK) {
+          Error_Handler("Can't open directory", res);
+        } else {
+          for(res = f_readdir(&dir, &fileInfo);
+              res == FR_OK && fileInfo.fname[0];
+              res = f_readdir(&dir, &fileInfo)) {
+
+            if (!(fileInfo.fattrib & AM_DIR)) {
+              uart_print(snprintf(str, STR_LENGTH, "File = %s Size = %ld\r\n", fileInfo.fname, fileInfo.fsize));
+            }
+
+//            HAL_UART_Transmit(&UartHandle, (uint8_t*)fileInfo.fname, strlen(fileInfo.fname), 0xFFFF);
+//            HAL_UART_Transmit(&UartHandle, (uint8_t*)"\r\n", 2, 0xFFFF);
+
+          }
+          f_closedir(&dir);
+
+          BSP_LED_On(LED3);
+          for (;;) {}
         }
-        BSP_LED_On(LED3);
-        for (;;) {}
       }
     }
+
+    FATFS_UnLinkDriver(USERPath);
   }
 }
 
@@ -219,6 +274,12 @@ int __io_putchar(int ch)
   return ch;
 }
 
+void uart_print(int strlen) {
+  if (strlen > 1) {
+    HAL_UART_Transmit(&UartHandle, (uint8_t *) &str, strlen, 0xFFFF);
+  }
+}
+
 #ifdef MEMORY_DEBUG
 static const char DIGIT[] = "0123456789abcdef";
 
@@ -294,7 +355,7 @@ static void SystemClock_Config(void)
 void Error_Handler(const char* message, int8_t res)
 {
   if (message != NULL) {
-    printf("%s: Res = %d\r\n", message, res);
+    uart_print(snprintf(str, STR_LENGTH, "%s: Res = %d\r\n", message, res));
   }
 
   /* Turn LED3 on */
@@ -302,20 +363,20 @@ void Error_Handler(const char* message, int8_t res)
   for(;;) {}
 }
 
-FRESULT ReadLongFile(uint16_t limit)
-{
-  uint16_t step=0;
-  UINT bytesRead;
-  uint32_t f_size = USERFile.fsize;
-
-  printf("File size: %lu\r\n", f_size);
-
-  for (uint32_t index = 0, count = 0; f_size > 0 && count < limit; index += step, count++) {
-    step = f_size < 512 ? f_size : 512;
-    f_size -= step;
-
-    f_lseek(&USERFile, index);
-    f_read (&USERFile, sect, step, &bytesRead);
-  }
-  return FR_OK;
-}
+//FRESULT ReadLongFile(uint16_t limit)
+//{
+//  uint16_t step=0;
+//  UINT bytesRead;
+//  uint32_t f_size = USERFile.fsize;
+//
+//  printf("File size: %lu\r\n", f_size);
+//
+//  for (uint32_t index = 0, count = 0; f_size > 0 && count < limit; index += step, count++) {
+//    step = f_size < 512 ? f_size : 512;
+//    f_size -= step;
+//
+//    f_lseek(&USERFile, index);
+//    f_read (&USERFile, sect, step, &bytesRead);
+//  }
+//  return FR_OK;
+//}

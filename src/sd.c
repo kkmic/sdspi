@@ -129,7 +129,7 @@ uint8_t SD_Write_Block (uint8_t *buff, uint32_t lba)
   SPI_SendByte (0xFE); //Начало буфера
 
   uint16_t cnt;
-  for (cnt=0; cnt<512; cnt++){
+  for (cnt = 0; cnt < 512; cnt++){
     SPI_SendByte(buff[cnt]); //Данные
   }
 
@@ -143,11 +143,25 @@ uint8_t SD_Write_Block (uint8_t *buff, uint32_t lba)
   do { //Ждем окончания состояния BUSY
     result = SPI_ReceiveByte();
     cnt++;
-  } while ((result != 0xFF) && (cnt < 0xFFFF));
+  } while (result != 0xFF && cnt < 0xFFFF);
 
-  if (cnt >= 0xFFFF) return 6;
-  return 0;
+  return cnt >= 0xFFFF ? 6 : 0;
 }
+
+//-----------------------------------------------
+uint8_t SPI_wait_ready(void)
+{
+  uint8_t res;
+  uint16_t cnt = 0;
+  do { //Ждем окончания состояния BUSY
+    res = SPI_ReceiveByte();
+    cnt++;
+  } while (res != 0xFF && cnt < 0xFFFF);
+
+  return cnt >= 0xFFFF ? 1 : res;
+
+}
+
 //-----------------------------------------------
 SD_StatusDef SD_Init(void)
 {
