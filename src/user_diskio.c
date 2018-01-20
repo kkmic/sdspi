@@ -137,7 +137,6 @@ DSTATUS USER_initialize (BYTE pdrv)  // Physical drive number to identify the dr
 //  printf("USER_initialize: %d\r\n", pdrv);
   if (SD_Init() == 0) {
     Stat &= ~STA_NOINIT;
-//    printf("Card type: %s\r\n", getCardTypeName());
   }
 
   return Stat;

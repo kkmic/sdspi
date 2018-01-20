@@ -109,8 +109,9 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     /* Configure the GPIO_LED pin */
     GPIO_InitStruct.Pin   = GPIO_PIN_12;
     GPIO_InitStruct.Mode  = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull  = GPIO_PULLUP;
+    GPIO_InitStruct.Pull  = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
 
     /**SPI2 GPIO Configuration
     PB13     ------> SPI2_SCK

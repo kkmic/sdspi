@@ -2,12 +2,10 @@
 // Created by kirill on 27.12.17.
 //
 
-#include <sd.h>
 #include "sd.h"
 
 extern void Error_Handler(const char* message, int8_t res);
 extern SPI_HandleTypeDef hspi2;
-
 SD_Info sd_info = {0};
 
 //--------------------------------------------------
@@ -177,7 +175,7 @@ SD_StatusDef SD_Init(void)
 
   HAL_StatusTypeDef ret = HAL_SPI_Init(&hspi2);
   if (ret != HAL_OK) {
-//    printf("Can't slow down SPI for SD initialization: %d\r\n", ret);
+    Error_Handler("Can't slow down SPI", ret);
     return SD_ERROR;
   }
 
@@ -191,7 +189,7 @@ SD_StatusDef SD_Init(void)
 
   ret = HAL_SPI_Init(&hspi2);
   if (ret != HAL_OK) {
-//    printf("Can't slow down SPI for SD initialization: %d\r\n", ret);
+    Error_Handler("Can't restore SPI prescaler", ret);
     return SD_ERROR;
   }
 
@@ -205,7 +203,6 @@ SD_StatusDef SD_Init(void)
       for (i = 0; i < 4; i++) {
         ocr[i] = SPI_ReceiveByte();
       }
-//      printf("CMD8 result: 0x%02X 0x%02X 0x%02X 0x%02X\r\n", ocr[0], ocr[1], ocr[2], ocr[3]);
 
       if (ocr[2] == 0x01 && ocr[3] == 0xaa) { // The card can work at vdd range of 2.7-3.6V
 
@@ -214,7 +211,6 @@ SD_StatusDef SD_Init(void)
         if (tmr && SD_cmd(CMD58, 0) == 0) { // Check CCS bit in the OCR
           for (i = 0; i < 4; i++) ocr[i] = SPI_ReceiveByte();
           sd_info.type = (ocr[0] & 0x40) ? CT_SD2 | CT_BLOCK : CT_SD2;
-//          printf("CMD58 OCR: 0x%02X 0x%02X 0x%02X 0x%02X\r\n", ocr[0], ocr[1], ocr[2], ocr[3]);
         }
       }
     } else { //SDv1 or MMCv3
@@ -233,10 +229,10 @@ SD_StatusDef SD_Init(void)
       }
     }
 
-//    printf("Card type SD: 0x%02X (%s)\r\n",sd_info.type, getCardTypeName());
     return SD_OK;
   }
 
+  Error_Handler("Can't enter idle state", 0);
   return SD_ERROR;
 }
 

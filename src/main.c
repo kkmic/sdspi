@@ -49,27 +49,46 @@
 UART_HandleTypeDef UartHandle;
 SPI_HandleTypeDef hspi2;
 
-void Error_Handler(const char* message, int8_t res);
+/* Variables to manage push button on board: interface between ExtLine interruption and main program */
+__IO uint8_t ubUserButtonClickEvent = RESET;  /* Event detection: Set after User Button interrupt */
+//__IO uint8_t resetReason = UNDEFINED;
 
 /* Private structures ---------------------------------------------------------*/
+static FIL USERFile;
 static FATFS SDFatFs;
 static char USERPath[4];   /* USER logical drive path */
-static FIL USERFile;  /* File object for USER */
 
 //static uint8_t sect[512];
 
 #define STR_LENGTH 64
-static char str[STR_LENGTH];
-
+char str[STR_LENGTH];
 void uart_print(int strlen);
+
+void Error_Handler(const char* message, int8_t res);
 
 /* Private functions ---------------------------------------------------------*/
 static void SystemClock_Config(void);
 static void UART_Init(void);
 static void SPI_Init(void);
-//static FRESULT ReadLongFile(uint16_t limit);
 
-//static const char TEST_STRING[] = "This is a test string";
+#define ADC_BUFFER_LENGTH 200
+static uint16_t adcBuffer[ADC_BUFFER_LENGTH];
+
+#define MAX_FILE_SIZE (200 * 1024 * 1024)
+
+static DWORD getFreeSize();
+static int getLastFileIndex();
+
+static const char DIRECTORY[] = "/TEST";
+static const char FILE_PREFIX[] = "OSC_";
+static const char FILE_EXTENSION[] = ".DAT";
+
+static const size_t FILE_PREFIX_LENGTH = 4;
+static const size_t FILE_EXTENSION_LENGTH = 4;
+
+/* Extern functions ---------------------------------------------------------*/
+extern caddr_t heap_end;
+extern char end asm("end");
 
 /**
   * @brief  Main program
@@ -80,32 +99,49 @@ int main(void)
 {
   /* STM32L1xx HAL library initialization:
        - Configure the Flash prefetch
-       - Systick timer is configured by default as source of time base, but user 
-         can eventually implement his proper time base source (a general purpose 
-         timer for example or other time source), keeping in mind that Time base 
-         duration should be kept 1ms since PPP_TIMEOUT_VALUEs are defined and 
+       - Systick timer is configured by default as source of time base, but user
+         can eventually implement his proper time base source (a general purpose
+         timer for example or other time source), keeping in mind that Time base
+         duration should be kept 1ms since PPP_TIMEOUT_VALUEs are defined and
          handled in milliseconds basis.
        - Set NVIC Group Priority to 4
        - Low Level Initialization
      */
   HAL_Init();
 
+  // TODO: if the board goes to error after reset, reinsert the card and reset again. The card has to loose the power
+  // to go through the proper power-up sequence. Not sure if the device-reset-only sequence exists in the specs.
+
+//// test the reset flags in order because the pin reset is always set.
+//  if (__HAL_RCC_GET_FLAG(RCC_FLAG_SFTRST)) {
+//    resetReason = SOFT;
+//  } else if (__HAL_RCC_GET_FLAG(RCC_FLAG_PORRST)) {
+//    resetReason = POWER;
+//  } else if (__HAL_RCC_GET_FLAG(RCC_FLAG_PINRST)) {
+//    resetReason = PIN;
+//  } else if (__HAL_RCC_GET_FLAG(RCC_FLAG_LPWRRST)) {
+//    resetReason = LOWPOWER;
+//  }
+//
+//// The flags must be cleared manually after use
+//  __HAL_RCC_CLEAR_RESET_FLAGS();
+
   BSP_LED_Init(LED3);
   BSP_LED_Init(LED4);
+
+  /* Configure User push-button in Interrupt mode */
+  BSP_PB_Init(BUTTON_USER, BUTTON_MODE_EXTI);
 
   /* Configure the system clock to 32 MHz */
   UART_Init();
   SystemClock_Config();
   SPI_Init();
 
-  BSP_LED_On(LED3);
-  BSP_LED_On(LED4);
-  HAL_Delay(200);
-  BSP_LED_Off(LED3);
-  BSP_LED_Off(LED4);
-  HAL_Delay(200);
+  register caddr_t stack_ptr asm ("sp");
+  int availableMemory = heap_end == NULL ? stack_ptr - &end : stack_ptr - heap_end;
 
-  uart_print(snprintf(str, STR_LENGTH, "\r\nInit ready.\r\n"));
+  uart_print(snprintf(str, STR_LENGTH, "\r\nInit ready. Available memory = %d\r\n", availableMemory));
+//  uart_print(snprintf(str, STR_LENGTH, "\r\nInit ready. Available memory = %d, Reset reason = %d\r\n", availableMemory, resetReason));
 
   if (FATFS_LinkDriver(&USER_Driver, USERPath) != 0) {
     Error_Handler("Init failed", 0);
@@ -116,6 +152,63 @@ int main(void)
     if ((res = f_mount(&SDFatFs, USERPath, 0)) != FR_OK) {
       Error_Handler("Mount failed", res);
     } else {
+      // Outer writing cycle
+      DWORD freeSize = getFreeSize();
+      while (freeSize > MAX_FILE_SIZE / 1024) { // while
+        uart_print(snprintf(str, STR_LENGTH, "%ld kB available\r\n", freeSize));
+
+        int newIndex = getLastFileIndex() + 1;
+        if (newIndex < 1000) {
+
+          char buffer[STR_LENGTH];
+          snprintf(buffer, 64, "%s/%s%03d%s", DIRECTORY, FILE_PREFIX, newIndex, FILE_EXTENSION);
+          uart_print(snprintf(str, STR_LENGTH, "Trying to create %s file\r\n", buffer));
+
+          if ((res = f_open(&USERFile, buffer, FA_CREATE_ALWAYS|FA_WRITE)) != FR_OK) {
+            Error_Handler("File creation failed", res);
+          } else {
+            // Let user know inner cycle started via board LEDs.
+            BSP_LED_On(LED3);
+            BSP_LED_On(LED4);
+            HAL_Delay(200);
+            BSP_LED_Off(LED3);
+            BSP_LED_Off(LED4);
+            HAL_Delay(200);
+
+            // Inner writing cycle
+            UINT bytesWritten = 0, blockWritten = 0;
+
+            while (ubUserButtonClickEvent == RESET && bytesWritten < MAX_FILE_SIZE) {
+              res = f_write(&USERFile, adcBuffer, ADC_BUFFER_LENGTH * sizeof(uint16_t), &blockWritten);
+              bytesWritten += blockWritten;
+
+              if (bytesWritten % 4000 == 0) {
+                BSP_LED_Toggle(LED3);
+              }
+            }
+
+            BSP_LED_Off(LED3);
+            ubUserButtonClickEvent = RESET;
+
+            if ((res = f_close(&USERFile)) != FR_OK) {
+              Error_Handler("Close failed", res);
+            }
+          }
+        } else {
+          Error_Handler("Too many files created. Allowed amount < 1000", 0);
+        }
+
+        freeSize = getFreeSize();
+      }
+      uart_print(snprintf(str, STR_LENGTH, "Not enough space on SD card: %ld KB, required %d KB\r\n", freeSize,
+                          MAX_FILE_SIZE / 1024));
+      Error_Handler(NULL, 0);
+    }
+
+    FATFS_UnLinkDriver(USERPath);
+  }
+}
+
 // Read example
 //      if ((res = f_open(&USERFile, "test/test.mp4", FA_READ)) != FR_OK) {
 //        Error_Handler("Open failed", res);
@@ -129,89 +222,74 @@ int main(void)
 //        BSP_LED_On(LED3);
 //        for (;;) {}
 //      }
-      if ((res = f_open(&USERFile, "test/test.dat", FA_CREATE_ALWAYS|FA_WRITE)) != FR_OK) {
-        Error_Handler("Create failed", res);
-      } else {
-// Write example
-//        UINT bytesWritten = 0;
-//        res = f_write(&USERFile, TEST_STRING, strlen(TEST_STRING), &bytesWritten);
-//        if (bytesWritten == 0 || res != FR_OK) {
-//          Error_Handler("Error writing file", res);
-//        } else {
-//          printf("Success.\r\n");
-//        }
-//
-//        if ((res = f_close(&USERFile)) != FR_OK) {
-//          Error_Handler("Close failed", res);
-//        }
 
-// Directory example
-        FILINFO fileInfo;
-//        char *fn;
-        DIR dir;
-//        DWORD fre_clust, fre_sect, tot_sect;
 
-        res = f_opendir(&dir, "/test");
-        if (res != FR_OK) {
-          Error_Handler("Can't open directory", res);
-        } else {
-          for(res = f_readdir(&dir, &fileInfo);
-              res == FR_OK && fileInfo.fname[0];
-              res = f_readdir(&dir, &fileInfo)) {
+static DIR dir;
 
-            if (!(fileInfo.fattrib & AM_DIR)) {
-              uart_print(snprintf(str, STR_LENGTH, "File = %s Size = %ld\r\n", fileInfo.fname, fileInfo.fsize));
-            }
+static int getLastFileIndex() {
+  FRESULT res = f_opendir(&dir, DIRECTORY);
 
-//            HAL_UART_Transmit(&UartHandle, (uint8_t*)fileInfo.fname, strlen(fileInfo.fname), 0xFFFF);
-//            HAL_UART_Transmit(&UartHandle, (uint8_t*)"\r\n", 2, 0xFFFF);
+  if (res != FR_OK) {
+    Error_Handler("Can't open directory", res);
+    return -1;
+  } else {
+    FILINFO fileInfo;
 
-          }
-          f_closedir(&dir);
+    int maxIndex = -1;
+    char buffer[17];
 
-          BSP_LED_On(LED3);
-          for (;;) {}
+    for (res = f_readdir(&dir, &fileInfo); res == FR_OK && fileInfo.fname[0]; res = f_readdir(&dir, &fileInfo)) {
+      size_t sl = strlen(fileInfo.fname);
+
+//      uart_print(snprintf(str, STR_LENGTH, "File = %s Size = %ld\r\n", fileInfo.fname, fileInfo.fsize));
+
+      if (!(fileInfo.fattrib & AM_DIR) && sl >= 10 &&
+          strncmp(FILE_PREFIX, fileInfo.fname, FILE_PREFIX_LENGTH) == 0 &&
+          strncmp(FILE_EXTENSION, fileInfo.fname + sl - FILE_EXTENSION_LENGTH, FILE_EXTENSION_LENGTH) == 0) {
+
+//        uart_print(snprintf(str, STR_LENGTH, "File = %s Size = %ld\r\n", fileInfo.lfname, fileInfo.fsize));
+
+        size_t l = sl - (FILE_PREFIX_LENGTH + FILE_EXTENSION_LENGTH);
+        if (l > 16) {
+          l = 16;
+        }
+
+        strncpy(buffer, fileInfo.fname + FILE_PREFIX_LENGTH, l);
+        buffer[l] = '\0';
+
+        int i = (int) strtol(buffer, NULL, 10);
+
+//        uart_print(snprintf(str, STR_LENGTH, "File buffer = %s, index = %d\r\n", buffer, i));
+
+        if (i > maxIndex) {
+          maxIndex = i;
         }
       }
     }
 
-    FATFS_UnLinkDriver(USERPath);
+//    uart_print(snprintf(str, STR_LENGTH, "Max index = %d, res = %d\r\n", maxIndex, res));
+
+    f_closedir(&dir);
+
+    return maxIndex;
   }
 }
 
-//    DWORD fre_clust, fre_sect, tot_sect;
-//    FILINFO fileInfo;
-//
-//    fileInfo.lfname = (char*)sect;
-//    fileInfo.lfsize = sizeof(sect);
-//    FRESULT result = f_opendir(&dir, "/");
-//    if (result == FR_OK)
-//    {
-//      while(1)
-//      {
-//        result = f_readdir(&dir, &fileInfo);
-//        if (result==FR_OK && fileInfo.fname[0])
-//        {
-//          fn = fileInfo.lfname;
-//          if(strlen(fn)) HAL_UART_Transmit(&huart1,(uint8_t*)fn,strlen(fn),0x1000);
-//          else HAL_UART_Transmit(&huart1,(uint8_t*)fileInfo.fname,strlen((char*)fileInfo.fname),0x1000);
-//          if(fileInfo.fattrib&AM_DIR)
-//          {
-//            HAL_UART_Transmit(&huart1,(uint8_t*)"  [DIR]",7,0x1000);
-//          }
-//        }
-//        else break;
-//        HAL_UART_Transmit(&huart1,(uint8_t*)"\r\n",2,0x1000);
-//      }
-//      f_closedir(&dir);
-//    }
-//  if (SD_Init() == SD_OK) {
-//    BSP_LED_On(LED3);
-//
-//  } else {
-//    printf("Can't init SD card\r\n");
-//    Error_Handler();
-//  }
+/*
+ * Calculate free size available on the mounted SD card KB.
+ */
+static DWORD getFreeSize()
+{
+  DWORD free_clust = 0;
+  FATFS *fs = NULL;
+  FRESULT res = f_getfree(DIRECTORY, &free_clust, &fs);
+  if (res == FR_OK) {
+    return free_clust * fs->csize / 2;
+  } else {
+    Error_Handler("f_getfree failed", res);
+    return 0;
+  }
+}
 
 static void UART_Init(void)
 {
@@ -265,14 +343,14 @@ static void SPI_Init(void)
   * @param  None
   * @retval None
   */
-int __io_putchar(int ch)
-{
-  /* Place your implementation of fputc here */
-  /* e.g. write a character to the EVAL_COM1 and Loop until the end of transmission */
-  HAL_UART_Transmit(&UartHandle, (uint8_t *)&ch, 1, 0xFFFF);
-
-  return ch;
-}
+//int __io_putchar(int ch)
+//{
+//  /* Place your implementation of fputc here */
+//  /* e.g. write a character to the EVAL_COM1 and Loop until the end of transmission */
+//  HAL_UART_Transmit(&UartHandle, (uint8_t *)&ch, 1, 0xFFFF);
+//
+//  return ch;
+//}
 
 void uart_print(int strlen) {
   if (strlen > 1) {
@@ -361,6 +439,11 @@ void Error_Handler(const char* message, int8_t res)
   /* Turn LED3 on */
   BSP_LED_On(LED4);
   for(;;) {}
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  ubUserButtonClickEvent =  (GPIO_Pin == USER_BUTTON_PIN) ? SET : RESET;
 }
 
 //FRESULT ReadLongFile(uint16_t limit)

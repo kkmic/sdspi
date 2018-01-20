@@ -94,18 +94,16 @@ int _write(int file, char *ptr, int len)
 }
 
 //extern caddr_t HEAP_START asm("_end");
+extern char end asm("end");
 register caddr_t stack_ptr asm ("sp");
+caddr_t heap_end = NULL;
 
 caddr_t _sbrk(int incr)
 {
-  extern char end asm("end");
-  static char *heap_end;
-  char *prev_heap_end;
-
-  if (heap_end == 0)
+  if (heap_end == NULL)
     heap_end = &end;
 
-  prev_heap_end = heap_end;
+  char *prev_heap_end = heap_end;
   if (heap_end + incr > stack_ptr) {
 
 #ifdef MEMORY_DEBUG

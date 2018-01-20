@@ -34,7 +34,7 @@ set(SOURCE_FILES
         ${FIRMWARE_ROOT}/Middlewares/Third_Party/FatFs/src/ff_gen_drv.c
         ${FIRMWARE_ROOT}/Middlewares/Third_Party/FatFs/src/ff.c
         ${FIRMWARE_ROOT}/Middlewares/Third_Party/FatFs/src/diskio.c
-#        ${FIRMWARE_ROOT}/Middlewares/Third_Party/FatFs/src/option/unicode.c
+        ${FIRMWARE_ROOT}/Middlewares/Third_Party/FatFs/src/option/unicode.c
         ${FIRMWARE_ROOT}/Drivers/BSP/STM32L152C-Discovery/stm32l152c_discovery.c
 )
 

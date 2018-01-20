@@ -138,6 +138,16 @@ void DebugMon_Handler(void)
 }
 
 /**
+  * @brief  This function handles external line 0 interrupt request.
+  * @param  None
+  * @retval None
+  */
+void EXTI0_IRQHandler(void)
+{
+  HAL_GPIO_EXTI_IRQHandler(USER_BUTTON_PIN);
+}
+
+/**
   * @brief  This function handles PendSVC exception.
   * @param  None
   * @retval None
