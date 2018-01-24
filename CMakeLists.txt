@@ -29,6 +29,11 @@ set(SOURCE_FILES
         ${FIRMWARE_ROOT}/Drivers/STM32L1xx_HAL_Driver/Src/stm32l1xx_hal_gpio.c
         ${FIRMWARE_ROOT}/Drivers/STM32L1xx_HAL_Driver/Src/stm32l1xx_hal_rcc.c
         ${FIRMWARE_ROOT}/Drivers/STM32L1xx_HAL_Driver/Src/stm32l1xx_hal_uart.c
+        ${FIRMWARE_ROOT}/Drivers/STM32L1xx_HAL_Driver/Src/stm32l1xx_hal_tim.c
+        ${FIRMWARE_ROOT}/Drivers/STM32L1xx_HAL_Driver/Src/stm32l1xx_hal_tim_ex.c
+        ${FIRMWARE_ROOT}/Drivers/STM32L1xx_HAL_Driver/Src/stm32l1xx_hal_adc.c
+        ${FIRMWARE_ROOT}/Drivers/STM32L1xx_HAL_Driver/Src/stm32l1xx_hal_adc_ex.c
+        ${FIRMWARE_ROOT}/Drivers/STM32L1xx_HAL_Driver/Src/stm32l1xx_hal_dma.c
         ${FIRMWARE_ROOT}/Drivers/STM32L1xx_HAL_Driver/Src/stm32l1xx_hal_spi.c
         ${FIRMWARE_ROOT}/Drivers/STM32L1xx_HAL_Driver/Src/stm32l1xx_hal_spi_ex.c
         ${FIRMWARE_ROOT}/Middlewares/Third_Party/FatFs/src/ff_gen_drv.c

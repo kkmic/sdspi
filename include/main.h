@@ -44,24 +44,49 @@
 
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
-/* User can use this section to tailor USARTx/UARTx instance used and associated
-   resources */
-/* Definition for USARTx clock resources */
-#define USARTx                           USART1
-#define USARTx_CLK_ENABLE()              __HAL_RCC_USART1_CLK_ENABLE();
-#define USARTx_RX_GPIO_CLK_ENABLE()      __HAL_RCC_GPIOA_CLK_ENABLE()
-#define USARTx_TX_GPIO_CLK_ENABLE()      __HAL_RCC_GPIOA_CLK_ENABLE()
 
-#define USARTx_FORCE_RESET()             __HAL_RCC_USART1_FORCE_RESET()
-#define USARTx_RELEASE_RESET()           __HAL_RCC_USART1_RELEASE_RESET()
+/* ## Definition of ADC related resources ################################### */
+/* Definition of ADCx clock resources */
+#define ADCx                            ADC1
+#define ADCx_CLK_ENABLE()               __HAL_RCC_ADC1_CLK_ENABLE()
 
-/* Definition for USARTx Pins */
-#define USARTx_TX_PIN                    GPIO_PIN_9
-#define USARTx_TX_GPIO_PORT              GPIOA
-#define USARTx_TX_AF                     GPIO_AF7_USART1
-#define USARTx_RX_PIN                    GPIO_PIN_10
-#define USARTx_RX_GPIO_PORT              GPIOA
-#define USARTx_RX_AF                     GPIO_AF7_USART1
+#define ADCx_FORCE_RESET()              __HAL_RCC_ADC1_FORCE_RESET()
+#define ADCx_RELEASE_RESET()            __HAL_RCC_ADC1_RELEASE_RESET()
+
+/* Definition of ADCx channels */
+#define ADCx_CHANNEL_1                   ADC_CHANNEL_1
+#define ADCx_CHANNEL_2                   ADC_CHANNEL_2
+#define ADCx_CHANNEL_3                   ADC_CHANNEL_3
+#define ADCx_CHANNEL_4                   ADC_CHANNEL_4
+
+/* Definition of ADCx channels pins */
+#define ADCx_CHANNELa_GPIO_CLK_ENABLE() __HAL_RCC_GPIOA_CLK_ENABLE()
+#define ADCx_CHANNELa_GPIO_PORT         GPIOA
+#define ADCx_CHANNEL_PIN_1              GPIO_PIN_1
+#define ADCx_CHANNEL_PIN_2              GPIO_PIN_2
+#define ADCx_CHANNEL_PIN_3              GPIO_PIN_3
+#define ADCx_CHANNEL_PIN_4              GPIO_PIN_4
+
+/* Definition of ADCx DMA resources */
+#define ADCx_DMA_CLK_ENABLE()           __HAL_RCC_DMA1_CLK_ENABLE()
+#define ADCx_DMA                        DMA1_Channel1
+
+#define ADCx_DMA_IRQn                   DMA1_Channel1_IRQn
+#define ADCx_DMA_IRQHandler             DMA1_Channel1_IRQHandler
+
+/* Definition of ADCx NVIC resources */
+#define ADCx_IRQn                       ADC1_IRQn
+#define ADCx_IRQHandler                 ADC1_IRQHandler
+
+
+#define ADC_EXTERNALTRIGCONV_Tx_TRGO    ADC_EXTERNALTRIGCONV_T2_TRGO
+
+/* Definition of TIMx clock resources */
+#define TIMx                            TIM2
+#define TIMx_CLK_ENABLE()               __HAL_RCC_TIM2_CLK_ENABLE()
+#define TIMx_FORCE_RESET()              __HAL_RCC_TIM2_FORCE_RESET()
+#define TIMx_RELEASE_RESET()            __HAL_RCC_TIM2_RELEASE_RESET()
+
 
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */

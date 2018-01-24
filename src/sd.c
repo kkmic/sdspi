@@ -4,7 +4,7 @@
 
 #include "sd.h"
 
-extern void Error_Handler(const char* message, int8_t res);
+extern void Error_Handler(const char* message, uint8_t res);
 extern SPI_HandleTypeDef hspi2;
 SD_Info sd_info = {0};
 
@@ -195,7 +195,6 @@ SD_StatusDef SD_Init(void)
 
   // Start sending init commands
   SS_SD_SELECT();
-
   if (SD_cmd(CMD0, 0) == 1) { // Enter Idle state
     SPI_Release();
     if (SD_cmd(CMD8, 0x1aa) == 1) { // SDv2
