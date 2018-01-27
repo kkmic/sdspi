@@ -77,8 +77,11 @@ static void SPI_Init(void);
 static void TIM_Init(void);
 static void ADC_Init(void);
 
-#define ADC_BUFFER_LENGTH 200
-static __IO uint16_t adcBuffer[ADC_BUFFER_LENGTH];
+#define ADC_BUFFER_LENGTH 256
+typedef uint16_t ADCType;
+static __IO ADCType adcBuffer[ADC_BUFFER_LENGTH];
+
+static char filename[STRING_LENGTH];
 
 #define MAX_FILE_SIZE (200 * 1024 * 1024)
 
@@ -142,12 +145,12 @@ int main(void)
   } else {
     uart_print(snprintf(buffer, STRING_LENGTH, "FatFS link driver successful\r\n"));
 
+    UINT bufferSize = ADC_BUFFER_LENGTH * sizeof(ADCType);
     FRESULT ret;
+
     if ((ret = f_mount(&SDFatFs, USERPath, 0)) != FR_OK) {
       Error_Handler("Mount failed", ret);
     } else {
-      char filename[STRING_LENGTH];
-
       // Outer writing cycle. Create file until there is space on the disk.
       DWORD freeSize = 0;
       for (freeSize = getFreeSize(); freeSize > MAX_FILE_SIZE / 1024; freeSize = getFreeSize()) {
@@ -177,26 +180,27 @@ int main(void)
 
             // Inner writing cycle
             UINT bytesWritten = 0, blockWritten = 0;
-
             while (ubUserButtonClickEvent == RESET && bytesWritten < MAX_FILE_SIZE) {
 
               // Wait until DMA completes all buffer ADC sampling
               while (ubUserButtonClickEvent == RESET && ubSequenceCompleted == RESET);
 
               if (ubSequenceCompleted == SET) {
-                ret = f_write(&USERFile, (void*)adcBuffer, ADC_BUFFER_LENGTH * sizeof(uint16_t), &blockWritten);
-                bytesWritten += blockWritten;
-
-                ubSequenceCompleted = RESET;
-
-                if (bytesWritten % TIMER_FREQUENCY_HZ == 0) {
-//                  uart_print(snprintf(buffer, STRING_LENGTH, "%d bytes written\r", bytesWritten));
-                  BSP_LED_Toggle(LED3);
+                ret = f_write(&USERFile, (void*)adcBuffer, bufferSize, &blockWritten);
+                if (ret != FR_OK) {
+                  Error_Handler("f_write error", ret);
                 }
+
+                bytesWritten += blockWritten;
+                ubSequenceCompleted = RESET;
+                BSP_LED_Toggle(LED3);
               }
             }
 
             uart_print(snprintf(buffer, STRING_LENGTH, "\r\nFlushing data to file, %d bytes written\r\n", bytesWritten));
+            if ((ret = f_close(&USERFile)) != FR_OK) {
+              Error_Handler("Close failed", ret);
+            }
 
             BSP_LED_Off(LED3);
             ubUserButtonClickEvent = RESET;
@@ -206,9 +210,6 @@ int main(void)
             }
             ubSequenceCompleted = RESET;
 
-            if ((ret = f_close(&USERFile)) != FR_OK) {
-              Error_Handler("Close failed", ret);
-            }
           }
         } else {
           Error_Handler("Too many files created. Allowed amount < 1000", 0);
@@ -545,6 +546,4 @@ void Error_Handler(const char* message, uint8_t res)
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   ubUserButtonClickEvent = (GPIO_Pin == USER_BUTTON_PIN) ? SET : RESET;
-//
-//  uart_print(snprintf(buffer, STRING_LENGTH, "\r\nUser button clicked = %s\r\n", ubUserButtonClickEvent == SET ? "True" : "False"));
 }
